@@ -5,6 +5,22 @@ import { hashPassword } from '../utils/crypto';
 // Webhook para validar key e salvar senha
 const PRIMEIRO_ACESSO_WEBHOOK = 'https://webhook.garagem.dev.br/webhook/e2d35e5186fdf8c179fb823ad12627ca';
 
+// Ícone de olho aberto (senha visível)
+const EyeIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+        <circle cx="12" cy="12" r="3" />
+    </svg>
+);
+
+// Ícone de olho fechado (senha oculta)
+const EyeOffIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+        <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+);
+
 export default function PrimeiroAcessoPage() {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -16,6 +32,26 @@ export default function PrimeiroAcessoPage() {
     const [errorMessage, setErrorMessage] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
     const [keyInvalida, setKeyInvalida] = useState(false);
+
+    // Estados para visibilidade das senhas
+    const [showNovaSenha, setShowNovaSenha] = useState(false);
+    const [showConfirmarSenha, setShowConfirmarSenha] = useState(false);
+
+    // Estilo do botão de olho (sem hover/animação)
+    const eyeButtonStyle = {
+        position: 'absolute',
+        right: '10px',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        color: 'rgba(255,255,255,0.5)',
+        padding: '4px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+    };
 
     // Ler key da URL ao carregar
     useEffect(() => {
@@ -68,7 +104,16 @@ export default function PrimeiroAcessoPage() {
                 })
             });
 
-            const result = await response.json();
+            // Trata resposta mesmo se não for JSON válido
+            let result = {};
+            try {
+                result = await response.json();
+            } catch {
+                // Se não conseguir parsear JSON, verifica só o status
+                if (response.ok) {
+                    result = { success: true };
+                }
+            }
 
             // Verifica resposta do webhook
             if (result.success || result.code === '200' || response.ok) {
@@ -134,30 +179,48 @@ export default function PrimeiroAcessoPage() {
                             <form onSubmit={handleSubmit}>
                                 <div className="mb-2rem" style={{ textAlign: "left" }}>
                                     <label htmlFor="novaSenha" style={{ display: 'block', marginBottom: '0.5rem', color: 'rgba(255,255,255,0.7)' }}>Nova Senha</label>
-                                    <input
-                                        id="novaSenha"
-                                        type="password"
-                                        value={novaSenha}
-                                        onChange={(e) => setNovaSenha(e.target.value)}
-                                        placeholder="Digite sua nova senha"
-                                        style={{ width: '100%', padding: '1rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white' }}
-                                        disabled={isSubmitting}
-                                        autoComplete="new-password"
-                                    />
+                                    <div style={{ position: 'relative' }}>
+                                        <input
+                                            id="novaSenha"
+                                            type={showNovaSenha ? 'text' : 'password'}
+                                            value={novaSenha}
+                                            onChange={(e) => setNovaSenha(e.target.value)}
+                                            placeholder="Digite sua nova senha"
+                                            style={{ width: '100%', padding: '1rem', paddingRight: '40px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white' }}
+                                            disabled={isSubmitting}
+                                            autoComplete="new-password"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowNovaSenha(!showNovaSenha)}
+                                            style={eyeButtonStyle}
+                                        >
+                                            {showNovaSenha ? <EyeOffIcon /> : <EyeIcon />}
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="mb-2rem" style={{ textAlign: "left" }}>
                                     <label htmlFor="confirmarSenha" style={{ display: 'block', marginBottom: '0.5rem', color: 'rgba(255,255,255,0.7)' }}>Confirmar Senha</label>
-                                    <input
-                                        id="confirmarSenha"
-                                        type="password"
-                                        value={confirmarSenha}
-                                        onChange={(e) => setConfirmarSenha(e.target.value)}
-                                        placeholder="Confirme sua nova senha"
-                                        style={{ width: '100%', padding: '1rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white' }}
-                                        disabled={isSubmitting}
-                                        autoComplete="new-password"
-                                    />
+                                    <div style={{ position: 'relative' }}>
+                                        <input
+                                            id="confirmarSenha"
+                                            type={showConfirmarSenha ? 'text' : 'password'}
+                                            value={confirmarSenha}
+                                            onChange={(e) => setConfirmarSenha(e.target.value)}
+                                            placeholder="Confirme sua nova senha"
+                                            style={{ width: '100%', padding: '1rem', paddingRight: '40px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white' }}
+                                            disabled={isSubmitting}
+                                            autoComplete="new-password"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowConfirmarSenha(!showConfirmarSenha)}
+                                            style={eyeButtonStyle}
+                                        >
+                                            {showConfirmarSenha ? <EyeOffIcon /> : <EyeIcon />}
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="mb-2rem">
