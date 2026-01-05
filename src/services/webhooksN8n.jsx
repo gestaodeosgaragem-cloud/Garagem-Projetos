@@ -105,14 +105,18 @@ export const atualizarStatusProjeto = async (id, novoStatus) => {
 /**
  * Lista as etapas (cards) de um projeto específico
  * @param {number} projectId - ID do projeto
+ * @param {boolean} approvedStatus - Status de aprovação do projeto
  * @returns {Promise<{success: boolean, data: Array, error: string|null}>}
  */
-export const listarEtapasProjeto = async (projectId) => {
-    console.log('📡 [webhooksN8n] Buscando etapas do projeto:', projectId);
+export const listarEtapasProjeto = async (projectId, approvedStatus = null) => {
+    console.log('📡 [webhooksN8n] Buscando etapas do projeto:', projectId, 'approved_status:', approvedStatus);
     return safeFetch(LISTAR_ETAPAS_PROJETO_WEBHOOK, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: projectId })
+        body: JSON.stringify({
+            project_id: projectId,
+            approved_status: approvedStatus
+        })
     });
 };
 

@@ -203,7 +203,7 @@ export default function ProjetoDetalhesModal({ projeto, onClose }) {
         setError(null);
         try {
             console.log('🔍 Buscando etapas para projeto ID:', projeto.id);
-            const response = await listarEtapasProjeto(projeto.id);
+            const response = await listarEtapasProjeto(projeto.id, projeto.aproved_status);
             console.log('📋 Resposta etapas:', response);
 
             if (response.success && response.data) {

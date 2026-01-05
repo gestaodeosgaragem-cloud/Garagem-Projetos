@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ProjetoDetalhesModal from '../components/modals/ProjetoDetalhesModal';
 import ProjetoEntregueModal from '../components/modals/ProjetoEntregueModal';
-import { LISTAR_PROJETOS_WEBHOOK, LISTAR_ETAPAS_PROJETO_WEBHOOK } from '../services/webhookUrls';
+import { LISTAR_PROJETOS_WEBHOOK } from '../services/webhookUrls';
 
 // Mapeamento de status do BD para os títulos do Kanban
 const STATUS_MAP = {
@@ -19,38 +19,6 @@ const KANBAN_COLUMNS = [
     'Aguardando aprovação',
     'Concluído'
 ];
-
-// Função para determinar status do projeto baseado nas etapas
-const determinarStatusProjeto = (projeto, etapas) => {
-    // Se approved_status === true, projeto está entregue (Concluído)
-    if (projeto.aproved_status === true) return 'done';
-
-    if (!etapas || etapas.length === 0) return 'waiting';
-
-    // Verifica se alguma etapa está pausada/aguardando cliente
-    const algumaPausada = etapas.some(e =>
-        e.status === 'pausado' || e.status === 'waiting_client' || e.status === 'em_espera'
-    );
-    if (algumaPausada) return 'waiting_client';
-
-    // Verifica se alguma etapa está em produção
-    const algumaEmProducao = etapas.some(e =>
-        e.status === 'em_producao' || e.status === 'em_andamento' || e.status === 'produzindo'
-    );
-    if (algumaEmProducao) return 'in_development';
-
-    // Verifica se alguma etapa está aguardando aprovação (concluída mas não aprovada)
-    const algumaAguardandoAprovacao = etapas.some(e =>
-        e.status === 'concluido' || e.status === 'aguardando_aprovacao'
-    );
-    if (algumaAguardandoAprovacao) return 'waiting_approval';
-
-    // Verifica se todas as etapas estão aprovadas
-    const todasAprovadas = etapas.every(e => e.status === 'aprovado');
-    if (todasAprovadas && etapas.length > 0) return 'done';
-
-    return 'waiting';
-};
 
 export default function ProjetosPage() {
     const [projetos, setProjetos] = useState([]);
@@ -84,7 +52,6 @@ export default function ProjetosPage() {
                 body: JSON.stringify(payload),
             });
 
-
             if (!response.ok) {
                 throw new Error(`Erro na requisição: ${response.status}`);
             }
@@ -99,51 +66,11 @@ export default function ProjetosPage() {
             }
 
             // Projetos são itens com production_permission = true
+            // O status já vem calculado do n8n
             const projetosAprovados = items.filter(item => item.production_permission === true);
 
-            // Buscar status atualizado de cada projeto via webhook de etapas
-            const projetosComStatusAtualizado = await Promise.all(
-                projetosAprovados.map(async (projeto) => {
-                    try {
-                        const etapasResponse = await fetch(LISTAR_ETAPAS_PROJETO_WEBHOOK, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ project_id: projeto.id })
-                        });
-
-                        if (etapasResponse.ok) {
-                            const etapasResult = await etapasResponse.json();
-                            const etapas = Array.isArray(etapasResult)
-                                ? etapasResult
-                                : etapasResult.data || [];
-
-                            // Se aproved_status === true, projeto está entregue (vai para Concluído)
-                            if (projeto.aproved_status === true) {
-                                return { ...projeto, status: 'done' };
-                            }
-
-                            // Se o projeto já tem status waiting_approval (delivery agendado), preservar
-                            if (projeto.status === 'waiting_approval') {
-                                return projeto;
-                            }
-
-                            // Determinar status baseado nas etapas e approved_status
-                            const statusAtualizado = determinarStatusProjeto(projeto, etapas);
-                            return { ...projeto, status: statusAtualizado };
-                        }
-                    } catch (err) {
-                        console.warn(`⚠️ Erro ao buscar etapas do projeto ${projeto.id}:`, err);
-                    }
-                    // Mesmo sem etapas, verificar approved_status
-                    if (projeto.aproved_status === true) {
-                        return { ...projeto, status: 'done' };
-                    }
-                    return projeto;
-                })
-            );
-
-            setProjetos(projetosComStatusAtualizado);
-            console.log('🔄 Projetos atualizados com status sincronizado:', projetosComStatusAtualizado.length);
+            setProjetos(projetosAprovados);
+            console.log('🔄 Projetos carregados:', projetosAprovados.length);
 
         } catch (err) {
             console.error('❌ Erro ao buscar projetos:', err);
@@ -172,8 +99,12 @@ export default function ProjetosPage() {
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [selectedProjeto]);
 
-    const getKanbanStatus = (status) => {
-        return STATUS_MAP[status] || 'Em espera';
+    const getKanbanStatus = (projeto) => {
+        // Se projeto está entregue (aproved_status === true), vai para Concluído
+        if (projeto.aproved_status === true) {
+            return 'Concluído';
+        }
+        return STATUS_MAP[projeto.status] || 'Em espera';
     };
 
     // Função para determinar se o card deve ter estilo de alerta
@@ -217,7 +148,7 @@ export default function ProjetosPage() {
 
                         <div className="kanban-coluna-body">
                             {projetos
-                                .filter(p => getKanbanStatus(p.status) === columnTitle)
+                                .filter(p => getKanbanStatus(p) === columnTitle)
                                 .map(p => (
                                     <div
                                         key={p.id}
@@ -236,7 +167,7 @@ export default function ProjetosPage() {
                                     </div>
                                 ))}
 
-                            {projetos.filter(p => getKanbanStatus(p.status) === columnTitle).length === 0 && (
+                            {projetos.filter(p => getKanbanStatus(p) === columnTitle).length === 0 && (
                                 <p className="kanban-vazio">Nenhum projeto</p>
                             )}
                         </div>
